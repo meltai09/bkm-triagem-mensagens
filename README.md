@@ -3,7 +3,7 @@
 Automação que classifica mensagens de clientes (WhatsApp/e-mail) usando LLM, extrai campos estruturados, grava em banco de dados e gera resumo diário. Inclui painel visual para consulta e análise.
 
 **Painel:** https://testetcnico.lovable.app/
-
+**Vídeo demonstrativo:** 🎥 [Assista aqui](https://drive.google.com/file/d/1lijyutu4Y3wra1YI-OZPCT9CI8lq2ClI/view?usp=sharing)
 ---
 
 ## Arquitetura
