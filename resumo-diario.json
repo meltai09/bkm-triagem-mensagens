@@ -1,0 +1,148 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "35016eb7-a467-4622-b9e3-b886328696a5",
+      "name": "Disparo Diário"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "mensagens",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processado_em",
+              "condition": "gte",
+              "keyValue": "={{ $now.startOf('day').toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "db3b32de-a91d-4411-be96-1ba4a89fde61",
+      "name": "Buscar Mensagens do Dia",
+      "credentials": {
+        "supabaseApi": {
+          "id": "qc9URF3rqR6730sa",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json); // agora cada item é uma linha da tabela\n\nconst categorias = [\"urgente_prazo\",\"duvida_processo\",\"agendamento\",\"financeiro\",\"documento_recebido\",\"spam_irrelevante\"];\n\nconst contagem = {};\ncategorias.forEach(c => contagem[c] = 0);\nitems.forEach(item => {\n  if (contagem[item.categoria] !== undefined) contagem[item.categoria]++;\n});\n\nconst urgentes = items\n  .filter(item => item.categoria === \"urgente_prazo\")\n  .sort((a, b) => new Date(a.data_prazo || '9999-12-31') - new Date(b.data_prazo || '9999-12-31'));\n\nconst hoje = new Date().toISOString().split('T')[0];\n\nlet texto = `📋 Resumo Diário de Mensagens — ${hoje}\\n`;\ntexto += `Total de mensagens: ${items.length}\\n\\n`;\n\nif (urgentes.length > 0) {\n  texto += `🔴 URGENTES (${urgentes.length})\\n`;\n  urgentes.forEach((item, idx) => {\n    const ehParteContraria = item.remetente_tipo === \"parte_contraria\";\n    const cliente = item.nome_cliente || (ehParteContraria ? \"Parte contrária\" : \"Não identificado\");\n    const alerta = ehParteContraria ? \" ⚠️ (parte contrária, não é cliente)\" : \"\";\n    texto += `${idx + 1}. ${cliente} — Processo: ${item.numero_processo || \"não informado\"} — Prazo: ${item.data_prazo || \"não informado\"}${alerta}\\n`;\n  });\n  texto += `\\n`;\n} else {\n  texto += `🔴 URGENTES: nenhuma mensagem urgente hoje.\\n\\n`;\n}\n\ntexto += `Por categoria:\\n`;\ncategorias.forEach(c => { texto += `- ${c}: ${contagem[c]}\\n`; });\n\nreturn [{\n  json: {\n    data: hoje,\n    total_mensagens: items.length,\n    total_urgentes: urgentes.length,\n    categorias_json: contagem, // deixamos como objeto — o node Supabase de gravação serializa sozinho\n    resumo_texto: texto\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "3d581d97-7990-4dbf-a462-641cffdc3f46",
+      "name": "Agregar por Categoria e Montar Resumo"
+    },
+    {
+      "parameters": {
+        "tableId": "resumos_diarios",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "data",
+              "fieldValue": "={{ $json.data }}"
+            },
+            {
+              "fieldId": "total_mensagens",
+              "fieldValue": "={{ $json.total_mensagens }}"
+            },
+            {
+              "fieldId": "total_urgentes",
+              "fieldValue": "={{ $json.total_urgentes }}"
+            },
+            {
+              "fieldId": "categorias_json",
+              "fieldValue": "={{ JSON.stringify($json.categorias_json) }}"
+            },
+            {
+              "fieldId": "resumo_texto",
+              "fieldValue": "={{ $json.resumo_texto }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "22ff74bb-ec0a-423e-9f68-94f253373de6",
+      "name": "Gravar Resumo no Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "qc9URF3rqR6730sa",
+          "name": "Supabase account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Disparo Diário": {
+      "main": [
+        [
+          {
+            "node": "Buscar Mensagens do Dia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Mensagens do Dia": {
+      "main": [
+        [
+          {
+            "node": "Agregar por Categoria e Montar Resumo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agregar por Categoria e Montar Resumo": {
+      "main": [
+        [
+          {
+            "node": "Gravar Resumo no Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e208b1e3df5bc4c58e61ceb6ea59a86775a40b4aae223629227a2b95f6d51b47"
+  }
+}
